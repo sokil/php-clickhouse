@@ -9,4 +9,3 @@
      volumes:
        - ./clickhouse-configs:/etc/clickhouse-server/
        - ./shared/clickhouse/data:/var/lib/clickhouse/
-       - ./shared/clickhouse/logs:/var/log/clickhouse-server/
