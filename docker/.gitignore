@@ -1,0 +1,5 @@
+clickhouse-configs/*-preprocessed.xml
+shared/*
+!shared/clickhouse/logs/.gitkeep
+!shared/clickhouse/data/.gitkeep
+!shared/.gitkeep
