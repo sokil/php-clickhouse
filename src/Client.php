@@ -33,15 +33,31 @@ class Client
     }
 
     /**
+     * @param string $query
+     *
+     * @todo set to private, resurt result object
+     */
+    public function execute(string $query)
+    {
+        $query = $query . ' FORMAT JSON';
+
+        $response = $this->connection->execute($query);
+
+        $response = \json_decode($response, true);
+
+        return $response;
+    }
+
+    /**
      * Check if connection alive
      *
      * @return bool
      */
     public function ping(): bool
     {
-        $response = $this->connection->execute('SELECT 1');
+        $response = $this->execute('SELECT 1');
 
-        return current($response) === "1";
+        return ($response['data'][0][1] ?? null) === "1";
     }
 
     /**
@@ -52,19 +68,5 @@ class Client
     public function persist($document): void
     {
 
-    }
-
-    /**
-     * Query request
-     *
-     * @param string $query
-     *
-     * @return array
-     */
-    public function execute(string $query): array
-    {
-        $response = $this->connection->execute($query);
-
-        return $response;
     }
 }

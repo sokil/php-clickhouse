@@ -1,6 +1,7 @@
-version: '3'
+version: '2'
 
 services:
+
   clickhouse:
     image: yandex/clickhouse-server
     ports:
@@ -9,10 +10,10 @@ services:
     volumes:
       - ./clickhouse-configs:/etc/clickhouse-server/
       - ./shared/clickhouse/data:/var/lib/clickhouse/
-       
-   kafka:
-     image: spotify/kafka
-     
-   zookeeper:
-     image: zookeeper
+
+  kafka:
+    image: spotify/kafka
+
+  zookeeper:
+    image: zookeeper
     

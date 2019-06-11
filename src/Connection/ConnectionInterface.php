@@ -8,7 +8,7 @@ interface ConnectionInterface
     /**
      * @param string $query
      *
-     * @return array
+     * @return string
      */
-    public function execute(string $query): array;
+    public function execute(string $query): string;
 }

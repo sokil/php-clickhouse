@@ -97,12 +97,11 @@ class CurlConnection implements ConnectionInterface
      *
      * @param string $query
      *
+     * @return string
      * @throws ConnectionError When connect error occured
      * @throws QueryError When error occurs when executing query
-     *
-     * @return array
      */
-    public function execute(string $query): array
+    public function execute(string $query): string
     {
         $curlSession = $this->getCurlSession();
 
@@ -112,7 +111,7 @@ class CurlConnection implements ConnectionInterface
             $query
         );
 
-        $response = trim(curl_exec($curlSession));
+        $response = curl_exec($curlSession);
         $responseCode = curl_getinfo($curlSession, CURLINFO_RESPONSE_CODE);
 
         if ($response === false) {
@@ -129,6 +128,6 @@ class CurlConnection implements ConnectionInterface
             throw new QueryError($response, $responseCode);
         }
 
-        return explode("\n", $response);
+        return $response;
     }
 }

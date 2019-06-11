@@ -17,13 +17,39 @@ class ConnectionTest extends TestCase
     {
         $client = new Client();
 
-        $tableName = 'test3';
+        $tableName = 'test';
 
-        $client->execute(sprintf('CREATE TABLE %s (id Int32) ENGINE=Memory', $tableName));
-        $client->execute(sprintf('INSERT INTO %s VALUES (1), (2), (3)', $tableName));
-        $response = $client->execute(sprintf('SELECT * FROM %s', $tableName));
-        $client->execute(sprintf('DROP TABLE %s', $tableName));
+        $client->execute(sprintf(
+            'DROP TABLE %s',
+            $tableName
+        ));
 
-        $this->assertEquals([1, 2, 3], $response);
+        $client->execute(sprintf(
+            'CREATE TABLE %s (id Int32, value Int32) ENGINE=Memory',
+            $tableName
+        ));
+
+        $client->execute(sprintf(
+            'INSERT INTO %s VALUES 
+              (10000000, 1), 
+              (2, 20000000), 
+              (30000000, 3)',
+            $tableName
+        ));
+
+        $response = $client->execute(sprintf(
+            'SELECT * FROM %s',
+            $tableName
+        ));
+
+        $client->execute(sprintf(
+            'DROP TABLE %s',
+            $tableName
+        ));
+
+        $this->assertEquals(
+            [[10000000, 1], [2, 20000000], [30000000, 3]],
+            $response
+        );
     }
 }
