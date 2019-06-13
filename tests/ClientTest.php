@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace Sokil\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
+use Sokil\ClickHouse\Connection\CurlConnection;
+use Sokil\ClickHouse\Connection\Exception\ExecuteError;
 
-class ConnectionTest extends TestCase
+class ClientTest extends TestCase
 {
     public const TABLE_NAME = 'test';
 
@@ -16,7 +18,7 @@ class ConnectionTest extends TestCase
 
     public function setUp()
     {
-        $this->client = new Client();
+        $this->client = new Client(new CurlConnection('http://localhost:8123/'));
 
         $this->client->execute(
             sprintf(
@@ -26,9 +28,36 @@ class ConnectionTest extends TestCase
         );
     }
 
-    public function testConnect()
+    public function testPing()
     {
         $this->assertTrue($this->client->ping());
+    }
+
+    /**
+     * @expectedException \Sokil\ClickHouse\Connection\Exception\ConnectError
+     * @expectedExceptionMessage Error connecting ClickHouse at http://server.com/
+     * @expectedExceptionCode 0
+     */
+    public function testConnectError()
+    {
+        $client = new Client(
+            new CurlConnection(
+                'http://server.com',
+                100
+            )
+        );
+
+        $client->ping();
+    }
+
+    /**
+     * @expectedException \Sokil\ClickHouse\Connection\Exception\ExecuteError
+     * @expectedExceptionMessage someUnknownTable doesn't exist
+     * @expectedExceptionCode 404
+     */
+    public function testExecuteError()
+    {
+        $this->client->execute('DROP TABLE someUnknownTable');
     }
 
     public function testQuery()
@@ -59,7 +88,7 @@ class ConnectionTest extends TestCase
 
         $this->assertEquals(
             [[10000000, 1], [2, 20000000], [30000000, 3]],
-            $response['data']
+            $response->getRows()
         );
     }
 }

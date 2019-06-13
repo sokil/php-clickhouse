@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace Sokil\ClickHouse;
 
 use Sokil\ClickHouse\Connection\ConnectionInterface;
-use Sokil\ClickHouse\Connection\CurlConnection;
+use Sokil\ClickHouse\Result\QueryResult;
+use Sokil\ClickHouse\Result\Result;
 
 /**
  * Connection to ClickHouse
@@ -19,49 +20,67 @@ class Client
     /**
      * @param ConnectionInterface $connection
      */
-    public function __construct(ConnectionInterface $connection = null)
+    public function __construct(ConnectionInterface $connection)
     {
-        $this->connection = $connection ?? $this->buildDefaultConnection();
-    }
-
-    /**
-     * @return ConnectionInterface
-     */
-    private function buildDefaultConnection(): ConnectionInterface
-    {
-        return new CurlConnection();
+        $this->connection = $connection;
     }
 
     /**
      * Perform SELECT requet
+     *
      * @param string $query
      *
-     * @todo set to private, resurt result object
+     * @return QueryResult
      */
-    public function query(string $query)
+    public function query(string $query) : QueryResult
     {
         $query = $query . ' FORMAT JSONCompact';
 
-        $response = $this->connection->execute($query);
+        $result = $this->execute($query);
 
-        $response = \json_decode($response, true);
+        $body = \json_decode($result->getBody(), true);
 
-        return $response;
+        return new QueryResult(
+            $result->getHeader('x-clickhouse-server-display-name'),
+            $result->getHeader('x-clickhouse-query-id'),
+            $body['data']
+        );
     }
 
     /**
      * Perform INSERT, UPDATE or DELETE requet
+     *
      * @param string $query
      *
-     * @todo set to private, resurt result object
+     * @return Result
      */
-    public function execute(string $query)
+    public function execute(string $query) : Result
     {
         $response = $this->connection->execute($query);
 
-        $response = \json_decode($response, true);
+        [$headers, $body] = explode("\r\n\r\n", $response);
 
-        return $response;
+        $headers = explode("\r\n", $headers);
+
+        // remove response code "HTTP/1.1 200 OK"
+        array_shift($headers);
+
+        // build headers array
+        $headers = array_reduce(
+            $headers,
+            function(array $carry, string $header) {
+                $header = array_map('trim', explode(':', $header, 2));
+                $carry[strtolower($header[0])] = $header[1];
+
+                return $carry;
+            },
+            []
+        );
+
+        return new Result(
+            $headers,
+            $body
+        );
     }
 
     /**
@@ -71,18 +90,8 @@ class Client
      */
     public function ping(): bool
     {
-        $response = $this->execute('SELECT 1');
+        $result = $this->query('SELECT 1');
 
-        return ($response['data'][0][1] ?? null) === "1";
-    }
-
-    /**
-     * Persist document to storage
-     *
-     * @param $document
-     */
-    public function persist($document): void
-    {
-
+        return ($result->getRows()[0][0] ?? null) === 1;
     }
 }

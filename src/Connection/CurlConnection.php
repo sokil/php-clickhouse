@@ -2,16 +2,14 @@
 declare(strict_types=1);
 
 namespace Sokil\ClickHouse\Connection;
-use Sokil\ClickHouse\Connection\Exception\ConnectionError;
-use Sokil\ClickHouse\Connection\Exception\QueryError;
+use Sokil\ClickHouse\Connection\Exception\ConnectError;
+use Sokil\ClickHouse\Connection\Exception\ExecuteError;
 
 /**
  * HTTP transport
  */
 class CurlConnection implements ConnectionInterface
 {
-    private const DEFAULT_DSN = 'http://localhost:8123/';
-
     private const DEFAULT_CONNECTION_TIMEOUT_MS = '3000';
 
     private const DEFAULT_REQUEST_TIMEOUT_MS = '3000';
@@ -43,13 +41,11 @@ class CurlConnection implements ConnectionInterface
      * @throws \InvalidArgumentException When DSN is invalid
      */
     public function __construct(
-        $dsn = null,
+        $dsn,
         int $connectionTimeoutMs = null,
         int $requestTimeoutMs = null
     ) {
-        if ($dsn == null) {
-            $this->dsn = self::DEFAULT_DSN;
-        } elseif (filter_var($dsn, FILTER_VALIDATE_URL) === false) {
+        if (filter_var($dsn, FILTER_VALIDATE_URL) === false) {
             throw new \InvalidArgumentException('ClickHouse DSN is invalid');
         } else {
             $this->dsn = rtrim($dsn, '/') . '/';
@@ -80,6 +76,7 @@ class CurlConnection implements ConnectionInterface
                     CURLOPT_POST => true,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HEADER => true,
                     CURLOPT_CONNECTTIMEOUT_MS => $this->connectionTimeoutMs,
                     CURLOPT_TIMEOUT_MS => $this->requestTimeoutMs,
                     CURLOPT_HTTPHEADER => [
@@ -98,8 +95,8 @@ class CurlConnection implements ConnectionInterface
      * @param string $query
      *
      * @return string
-     * @throws ConnectionError When connect error occured
-     * @throws QueryError When error occurs when executing query
+     * @throws ConnectError When connect error occured
+     * @throws ExecuteError When error occurs when executing query
      */
     public function execute(string $query): string
     {
@@ -115,7 +112,7 @@ class CurlConnection implements ConnectionInterface
         $responseCode = curl_getinfo($curlSession, CURLINFO_RESPONSE_CODE);
 
         if ($response === false) {
-            throw new ConnectionError(
+            throw new ConnectError(
                 sprintf(
                     'Error connecting ClickHouse at %s',
                     $this->dsn
@@ -124,8 +121,8 @@ class CurlConnection implements ConnectionInterface
             );
         }
 
-        if ($responseCode === 500) {
-            throw new QueryError($response, $responseCode);
+        if ($responseCode !== 200) {
+            throw new ExecuteError($response, $responseCode);
         }
 
         return $response;
