@@ -33,14 +33,30 @@ class Client
     }
 
     /**
+     * Perform SELECT requet
+     * @param string $query
+     *
+     * @todo set to private, resurt result object
+     */
+    public function query(string $query)
+    {
+        $query = $query . ' FORMAT JSONCompact';
+
+        $response = $this->connection->execute($query);
+
+        $response = \json_decode($response, true);
+
+        return $response;
+    }
+
+    /**
+     * Perform INSERT, UPDATE or DELETE requet
      * @param string $query
      *
      * @todo set to private, resurt result object
      */
     public function execute(string $query)
     {
-        $query = $query . ' FORMAT JSON';
-
         $response = $this->connection->execute($query);
 
         $response = \json_decode($response, true);

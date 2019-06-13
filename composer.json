@@ -29,11 +29,11 @@
     "phpunit/phpunit": "^8.0",
     "satooshi/php-coveralls": ">=0.7.1 <2.0",
     "squizlabs/php_codesniffer": "^2.3",
-    "phpmd/phpmd" : "@stable"
+    "phpmd/phpmd" : "@stable",
+    "phpbench/phpbench": "@stable",
+    "infection/infection": "@stable"
   },
   "suggest": {
-    "phpbench/phpbench": "PHPBench is a benchmarking framework for PHP",
-    "infection/infection": "AST based PHP Mutation Testing Framework"
   },
   "scripts": {
     "test": "./vendor/bin/phpunit",

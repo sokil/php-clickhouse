@@ -7,49 +7,59 @@ use PHPUnit\Framework\TestCase;
 
 class ConnectionTest extends TestCase
 {
+    public const TABLE_NAME = 'test';
+
+    /**
+     * @var Client
+     */
+    private $client;
+
+    public function setUp()
+    {
+        $this->client = new Client();
+
+        $this->client->execute(
+            sprintf(
+                'DROP TABLE IF EXISTS %s',
+                self::TABLE_NAME
+            )
+        );
+    }
+
     public function testConnect()
     {
-        $client = new Client();
-        $this->assertTrue($client->ping());
+        $this->assertTrue($this->client->ping());
     }
 
     public function testQuery()
     {
-        $client = new Client();
-
-        $tableName = 'test';
-
-        $client->execute(sprintf(
-            'DROP TABLE %s',
-            $tableName
-        ));
-
-        $client->execute(sprintf(
+        $this->client->execute(
+            sprintf(
             'CREATE TABLE %s (id Int32, value Int32) ENGINE=Memory',
-            $tableName
-        ));
+                self::TABLE_NAME
+            )
+        );
 
-        $client->execute(sprintf(
-            'INSERT INTO %s VALUES 
-              (10000000, 1), 
-              (2, 20000000), 
-              (30000000, 3)',
-            $tableName
-        ));
+        $this->client->execute(
+            sprintf(
+                'INSERT INTO %s VALUES (10000000, 1), (2, 20000000), (30000000, 3)',
+                self::TABLE_NAME
+            )
+        );
 
-        $response = $client->execute(sprintf(
+        $response = $this->client->query(sprintf(
             'SELECT * FROM %s',
-            $tableName
+            self::TABLE_NAME
         ));
 
-        $client->execute(sprintf(
+        $this->client->execute(sprintf(
             'DROP TABLE %s',
-            $tableName
+            self::TABLE_NAME
         ));
 
         $this->assertEquals(
             [[10000000, 1], [2, 20000000], [30000000, 3]],
-            $response
+            $response['data']
         );
     }
 }
