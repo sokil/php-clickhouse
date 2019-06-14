@@ -34,6 +34,11 @@ class CurlConnection implements ConnectionInterface
     private $requestTimeoutMs;
 
     /**
+     * @var resource
+     */
+    private $curlSession;
+
+    /**
      * @param string|null $dsn Connection string
      * @param int $connectionTimeoutMs Connection timeout in milliseconds
      * @param int $requestTimeoutMs Timeout of total request time in milliseconds
@@ -55,11 +60,6 @@ class CurlConnection implements ConnectionInterface
 
         $this->requestTimeoutMs = $requestTimeoutMs ?? self::DEFAULT_REQUEST_TIMEOUT_MS;
     }
-
-    /**
-     * @var resource
-     */
-    private $curlSession;
 
     /**
      * @return resource

@@ -27,6 +27,8 @@
     "psr/http-message": "^1.0"
   },
   "require-dev": {
+    "ext-curl": "*",
+    "ext-sockets": "*",
     "phpunit/phpunit": "^7.5 || ^8.0",
     "satooshi/php-coveralls": ">=0.7.1 <2.0",
     "squizlabs/php_codesniffer": "^2.3",
@@ -35,7 +37,8 @@
     "infection/infection": "@stable"
   },
   "suggest": {
-    "ext-curl": "Support of Curl connection"
+    "ext-curl": "Support of curl connection",
+    "ext-sockets": "Support of socket connection"
   },
   "scripts": {
     "test": "./vendor/bin/phpunit",

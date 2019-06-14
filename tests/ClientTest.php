@@ -5,7 +5,6 @@ namespace Sokil\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
 use Sokil\ClickHouse\Connection\CurlConnection;
-use Sokil\ClickHouse\Connection\Exception\ExecuteError;
 
 class ClientTest extends TestCase
 {
