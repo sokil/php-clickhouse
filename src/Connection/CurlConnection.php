@@ -10,9 +10,9 @@ use Sokil\ClickHouse\Connection\Exception\ExecuteError;
  */
 class CurlConnection implements ConnectionInterface
 {
-    private const DEFAULT_CONNECTION_TIMEOUT_MS = '3000';
+    private const DEFAULT_CONNECTION_TIMEOUT_MS = 3000;
 
-    private const DEFAULT_REQUEST_TIMEOUT_MS = '3000';
+    private const DEFAULT_REQUEST_TIMEOUT_MS = 3000;
 
     /**
      * Connection string

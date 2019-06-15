@@ -34,6 +34,7 @@ class ConnectionTest extends TestCase
                 self::TABLE_NAME
             )
         );
+
         $connection->execute(
             sprintf(
                 'CREATE TABLE %s (id Int32, value Int32) ENGINE=Memory',
