@@ -123,9 +123,24 @@ class SocketConnection implements ConnectionInterface
 
     public function execute(string $query): string
     {
+        // prepare HTTP QUERY
+        $requestURI = 'POST / HTTP/1.1';
+        $requestHeaders = [
+            'Content-Length: ' . mb_strlen($query),
+        ];
+        $requestBODY = $query;
+
+        $request = implode("\r\n", [
+            $requestURI,
+            implode("\r\n", $requestHeaders),
+            "\n", $requestBODY
+        ]);
+
+        // create socket
         $socket = $this->getSocket();
 
-        if (!socket_write($socket, $query, mb_strlen($query))) {
+        // send request
+        if (!socket_write($socket, $request, mb_strlen($request))) {
             $errorCode = socket_last_error();
             $errorMessage = socket_strerror($errorCode);
             throw new ExecuteError(
@@ -134,6 +149,7 @@ class SocketConnection implements ConnectionInterface
             );
         }
 
+        // wait response
         $read = [$this->socket];
         $write = [];
         $except = [];
@@ -153,6 +169,7 @@ class SocketConnection implements ConnectionInterface
             throw new ExecuteError('Select timeout');
         }
 
+        // read response
         $result = '';
 
         while (true) {
