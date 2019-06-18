@@ -2,64 +2,20 @@
 declare(strict_types=1);
 
 namespace Sokil\ClickHouse\Connection;
+
 use Sokil\ClickHouse\Connection\Exception\ConnectError;
-use Sokil\ClickHouse\Connection\Exception\ExecuteError;
+use Sokil\ClickHouse\Connection\Exception\RequestError;
+use Sokil\ClickHouse\Connection\Exception\QueryError;
 
 /**
  * HTTP transport
  */
-class CurlConnection implements ConnectionInterface
+class CurlConnection extends AbstractConnection
 {
-    private const DEFAULT_CONNECTION_TIMEOUT_MS = 3000;
-
-    private const DEFAULT_REQUEST_TIMEOUT_MS = 3000;
-
-    /**
-     * Connection string
-     *
-     * @var string
-     */
-    private $dsn;
-
-    /**
-     * Connection timeout in milliseconds
-     *
-     * @var int
-     */
-    private $connectionTimeoutMs;
-
-    /**
-     * @var int
-     */
-    private $requestTimeoutMs;
-
     /**
      * @var resource
      */
     private $curlSession;
-
-    /**
-     * @param string|null $dsn Connection string
-     * @param int $connectionTimeoutMs Connection timeout in milliseconds
-     * @param int $requestTimeoutMs Timeout of total request time in milliseconds
-     *
-     * @throws \InvalidArgumentException When DSN is invalid
-     */
-    public function __construct(
-        $dsn,
-        int $connectionTimeoutMs = null,
-        int $requestTimeoutMs = null
-    ) {
-        if (filter_var($dsn, FILTER_VALIDATE_URL) === false) {
-            throw new \InvalidArgumentException('ClickHouse DSN is invalid');
-        } else {
-            $this->dsn = rtrim($dsn, '/') . '/';
-        }
-
-        $this->connectionTimeoutMs = $connectionTimeoutMs ?? self::DEFAULT_CONNECTION_TIMEOUT_MS;
-
-        $this->requestTimeoutMs = $requestTimeoutMs ?? self::DEFAULT_REQUEST_TIMEOUT_MS;
-    }
 
     /**
      * @return resource
@@ -72,13 +28,13 @@ class CurlConnection implements ConnectionInterface
             curl_setopt_array(
                 $this->curlSession,
                 [
-                    CURLOPT_URL => $this->dsn,
+                    CURLOPT_URL => sprintf('%s:%s', $this->getHost(), $this->getPort()),
                     CURLOPT_POST => true,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_HEADER => true,
-                    CURLOPT_CONNECTTIMEOUT_MS => $this->connectionTimeoutMs,
-                    CURLOPT_TIMEOUT_MS => $this->requestTimeoutMs,
+                    CURLOPT_CONNECTTIMEOUT_MS => $this->getConnectionTimeoutMs(),
+                    CURLOPT_TIMEOUT_MS => $this->getRequestTimeoutMs(),
                     CURLOPT_HTTPHEADER => [
                         'Content-type' => 'application/x-www-form-urlencoded',
                     ],
@@ -95,8 +51,9 @@ class CurlConnection implements ConnectionInterface
      * @param string $query
      *
      * @return string
-     * @throws ConnectError When connect error occured
-     * @throws ExecuteError When error occurs when executing query
+     *
+     * @throws ConnectError When response not fetched or non-HTTP response
+     * @throws QueryError When response fetched and code ss not 200
      */
     public function execute(string $query): string
     {
@@ -114,15 +71,16 @@ class CurlConnection implements ConnectionInterface
         if ($response === false) {
             throw new ConnectError(
                 sprintf(
-                    'Error connecting ClickHouse at %s',
-                    $this->dsn
+                    'Error connecting ClickHouse at %s:%s',
+                    $this->getHost(),
+                    $this->getPort()
                 ),
                 $responseCode
             );
         }
 
         if ($responseCode !== 200) {
-            throw new ExecuteError($response, $responseCode);
+            throw new QueryError($response, $responseCode);
         }
 
         return $response;

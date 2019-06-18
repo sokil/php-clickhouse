@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Sokil\ClickHouse;
 
-use Sokil\ClickHouse\Connection\ConnectionInterface;
+use Sokil\ClickHouse\Connection\AbstractConnection;
 use Sokil\ClickHouse\Result\QueryResult;
 use Sokil\ClickHouse\Result\Result;
 
@@ -13,15 +13,17 @@ use Sokil\ClickHouse\Result\Result;
 class Client
 {
     /**
-     * @var ConnectionInterface
+     * @var AbstractConnection
      */
     private $connection;
 
     /**
-     * @param ConnectionInterface $connection
+     * Client constructor.
+     *
+     * @param AbstractConnection $connection
      */
-    public function __construct(ConnectionInterface $connection)
-    {
+    public function __construct(AbstractConnection $connection
+    ) {
         $this->connection = $connection;
     }
 

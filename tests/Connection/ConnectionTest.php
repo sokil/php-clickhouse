@@ -13,7 +13,7 @@ class ConnectionTest extends TestCase
     {
         return [
             'curl' => [
-                'connection' => new CurlConnection('http://localhost:8123/')
+                'connection' => new CurlConnection('localhost', 8123)
             ],
             'socket' => [
                 'connection' => new SocketConnection('localhost', 8123)
@@ -24,9 +24,9 @@ class ConnectionTest extends TestCase
     /**
      * @dataProvider getConnections
      *
-     * @param ConnectionInterface $connection
+     * @param AbstractConnection $connection
      */
-    public function testExecute(ConnectionInterface $connection)
+    public function testExecute(AbstractConnection $connection)
     {
         $connection->execute(
             sprintf(

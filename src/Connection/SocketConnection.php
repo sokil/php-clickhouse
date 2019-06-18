@@ -4,64 +4,20 @@ declare(strict_types=1);
 namespace Sokil\ClickHouse\Connection;
 
 use Sokil\ClickHouse\Connection\Exception\ConnectError;
-use Sokil\ClickHouse\Connection\Exception\ExecuteError;
+use Sokil\ClickHouse\Connection\Exception\RequestError;
+use Sokil\ClickHouse\Connection\Exception\QueryError;
 
 /**
  * Socket transport
  */
-class SocketConnection implements ConnectionInterface
+class SocketConnection extends AbstractConnection
 {
-    private const DEFAULT_CONNECTION_TIMEOUT_MS = 3000;
-
-    private const DEFAULT_REQUEST_TIMEOUT_MS = 3000;
-
-    /**
-     * @var string
-     */
-    private $host;
-
-    /**
-     * @var int
-     */
-    private $port;
-
-    /**
-     * Connection timeout in milliseconds
-     *
-     * @var int
-     */
-    private $connectionTimeoutMs;
-
-    /**
-     * @var int
-     */
-    private $requestTimeoutMs;
+    private const READ_BUFFER_LENGTH = 1024;
 
     /**
      * @var resource
      */
     private $socket;
-
-    /**
-     * SocketConnection constructor.
-     *
-     * @param string $host
-     * @param int $port
-     * @param int $connectionTimeoutMs Connection timeout in milliseconds
-     * @param int $requestTimeoutMs Timeout of total request time in milliseconds
-     */
-    public function __construct(
-        string $host,
-        int $port,
-        int $connectionTimeoutMs = null,
-        int $requestTimeoutMs = null
-    ) {
-        $this->host = $host;
-        $this->port = $port;
-        $this->connectionTimeoutMs = $connectionTimeoutMs ?? self::DEFAULT_CONNECTION_TIMEOUT_MS;
-        $this->requestTimeoutMs = $requestTimeoutMs ?? self::DEFAULT_REQUEST_TIMEOUT_MS;
-    }
-
 
     /**
      * @return resource
@@ -75,8 +31,8 @@ class SocketConnection implements ConnectionInterface
                 SOL_TCP
             );
 
-            $seconds = (int)floor($this->requestTimeoutMs / 1e6);
-            $microseconds = $this->requestTimeoutMs - $seconds * 1e6;
+            $seconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
+            $microseconds = $this->getRequestTimeoutMs() - $seconds * 1e6;
 
             socket_set_option(
                 $this->socket,
@@ -108,7 +64,7 @@ class SocketConnection implements ConnectionInterface
 
             socket_set_block($this->socket);
 
-            if (!socket_connect($this->socket, $this->host, $this->port)) {
+            if (!socket_connect($this->socket, $this->getHost(), $this->getPort())) {
                 $errorCode = socket_last_error();
                 $errorMessage = socket_strerror($errorCode);
                 throw new ConnectError(
@@ -143,13 +99,60 @@ class SocketConnection implements ConnectionInterface
         if (!socket_write($socket, $request, mb_strlen($request))) {
             $errorCode = socket_last_error();
             $errorMessage = socket_strerror($errorCode);
-            throw new ExecuteError(
+            throw new ConnectError(
                 sprintf('Send request error: %s', $errorMessage),
                 $errorCode
             );
         }
 
-        // wait response
+        // wait read
+        $this->waitRead();
+
+        // read response
+        $response = '';
+
+        while (true) {
+            $responseChunk = socket_read($this->socket, self::READ_BUFFER_LENGTH);
+
+            if ($responseChunk === false) {
+                $errorCode = socket_last_error();
+                $errorMessage = socket_strerror($errorCode);
+                throw new ConnectError(
+                    sprintf('Receive response error: %s', $errorMessage),
+                    $errorCode
+                );
+            }
+
+            if ($responseChunk === '') {
+                break;
+            }
+
+            $response .= $responseChunk;
+
+            if (mb_strlen($responseChunk) < self::READ_BUFFER_LENGTH) {
+                break;
+            }
+        }
+
+        // get response code
+        if (preg_match('~HTTP/\d\.\d (\d{3})~', mb_substr($response, 0, 12), $matches)) {
+            $responseCode = (int)$matches[1];
+
+            if ($responseCode !== 200) {
+                throw new QueryError($response, $responseCode);
+            }
+        } else {
+            throw new ConnectError('Not HTTP response');
+        }
+
+        return $response;
+    }
+
+    /**
+     * wait response
+     */
+    private function waitRead() : void
+    {
         $read = [$this->socket];
         $write = [];
         $except = [];
@@ -159,39 +162,15 @@ class SocketConnection implements ConnectionInterface
         if ($selectResult === false) {
             $errorCode = socket_last_error();
             $errorMessage = socket_strerror($errorCode);
-            throw new ExecuteError(
+            throw new ConnectError(
                 sprintf('Receive response error: %s', $errorMessage),
                 $errorCode
             );
         }
 
         if ($selectResult === 0) {
-            throw new ExecuteError('Select timeout');
+            throw new ConnectError('Socket select timeout');
         }
-
-        // read response
-        $result = '';
-
-        while (true) {
-            $buffer = socket_read($this->socket, 1024);
-
-            if ($buffer === false) {
-                $errorCode = socket_last_error();
-                $errorMessage = socket_strerror($errorCode);
-                throw new ExecuteError(
-                    sprintf('Receive response error: %s', $errorMessage),
-                    $errorCode
-                );
-            }
-
-            if ($buffer === '') {
-                break;
-            }
-
-            $result .= $buffer;
-        }
-
-        return $result;
     }
 
 }
