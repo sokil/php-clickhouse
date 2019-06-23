@@ -13,12 +13,18 @@ class SocketConnection extends AbstractConnection
 {
     private const READ_BUFFER_LENGTH = 1024;
 
+    private $socket;
+
     /**
      * @return resource
      */
-    public function createSocket()
+    public function getSocket()
     {
-        $socket = socket_create(
+        if ($this->socket) {
+            return $this->socket;
+        }
+
+        $this->socket = socket_create(
             AF_INET,
             SOCK_STREAM,
             SOL_TCP
@@ -28,7 +34,7 @@ class SocketConnection extends AbstractConnection
         $microseconds = $this->getRequestTimeoutMs() - $seconds * 1e6;
 
         socket_set_option(
-            $socket,
+            $this->socket,
             SOL_SOCKET,
             SO_RCVTIMEO,
             [
@@ -38,14 +44,14 @@ class SocketConnection extends AbstractConnection
         );
 
         socket_set_option(
-            $socket,
+            $this->socket,
             SOL_SOCKET,
             SO_KEEPALIVE,
             1
         );
 
         socket_set_option(
-            $socket,
+            $this->socket,
             SOL_SOCKET,
             SO_SNDTIMEO,
             [
@@ -56,15 +62,15 @@ class SocketConnection extends AbstractConnection
 
         // Disable Nagle's algorithm, which optimises sending of small packets
         socket_set_option(
-            $socket,
+            $this->socket,
             SOL_TCP,
             TCP_NODELAY,
             1
         );
 
-        socket_set_block($socket);
+        socket_set_block($this->socket);
 
-        if (!socket_connect($socket, $this->getHost(), $this->getPort())) {
+        if (!socket_connect($this->socket, $this->getHost(), $this->getPort())) {
             $errorCode = socket_last_error();
             $errorMessage = socket_strerror($errorCode);
             throw new ConnectError(
@@ -73,13 +79,15 @@ class SocketConnection extends AbstractConnection
             );
         }
 
-        return $socket;
+        return $this->socket;
     }
 
     public function execute(string $query): string
     {
+        $query .= "\r\n";
+
         // create socket
-        $socket = $this->createSocket();
+        $socket = $this->getSocket();
 
         // prepare HTTP QUERY
         $request =
@@ -96,8 +104,7 @@ class SocketConnection extends AbstractConnection
             ) .
             "\r\n" .
             "\r\n" .
-            $query .
-            "\r\n";
+            $query;
 
         $this->wait($socket);
 
@@ -181,5 +188,4 @@ class SocketConnection extends AbstractConnection
             throw new ConnectError('Socket select timeout');
         }
     }
-
 }
