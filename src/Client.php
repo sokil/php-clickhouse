@@ -9,6 +9,8 @@ use Sokil\ClickHouse\Result\Result;
 
 /**
  * Connection to ClickHouse
+ *
+ * @see https://clickhouse-docs.readthedocs.io/en/latest/interfaces/http_interface.html
  */
 class Client
 {

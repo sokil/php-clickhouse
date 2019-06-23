@@ -36,7 +36,7 @@ class CurlConnection extends AbstractConnection
                     CURLOPT_CONNECTTIMEOUT_MS => $this->getConnectionTimeoutMs(),
                     CURLOPT_TIMEOUT_MS => $this->getRequestTimeoutMs(),
                     CURLOPT_HTTPHEADER => [
-                        'Content-type' => 'application/x-www-form-urlencoded',
+                        'Content-type' => 'text/plain; charset=UTF-8',
                     ],
                 ]
             );

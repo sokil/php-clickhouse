@@ -12,11 +12,11 @@ class ConnectionTest extends TestCase
     public function getConnections()
     {
         return [
-            'curl' => [
-                'connection' => new CurlConnection('localhost', 8123)
-            ],
             'socket' => [
                 'connection' => new SocketConnection('localhost', 8123)
+            ],
+            'curl' => [
+                'connection' => new CurlConnection('localhost', 8123)
             ],
         ];
     }
@@ -37,7 +37,7 @@ class ConnectionTest extends TestCase
 
         $connection->execute(
             sprintf(
-                'CREATE TABLE %s (id Int32, value Int32) ENGINE=Memory',
+                'CREATE TABLE %s (id Int32, value Int32) ENGINE=Memory;',
                 self::TABLE_NAME
             )
         );
