@@ -146,9 +146,11 @@ class SocketConnection extends AbstractConnection
 
             $response .= $responseChunk;
 
+            /*
             if (mb_strlen($responseChunk) < self::READ_BUFFER_LENGTH) {
                 break;
             }
+            */
         }
 
         // get response code

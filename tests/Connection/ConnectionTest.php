@@ -12,6 +12,9 @@ class ConnectionTest extends TestCase
     public function getConnections()
     {
         return [
+            'stream' => [
+                'connection' => new StreamConnection('localhost', 8123)
+            ],
             'socket' => [
                 'connection' => new SocketConnection('localhost', 8123)
             ],
