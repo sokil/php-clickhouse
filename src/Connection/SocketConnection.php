@@ -13,6 +13,9 @@ class SocketConnection extends AbstractConnection
 {
     private const READ_BUFFER_LENGTH = 1024;
 
+    /**
+     * @var resource
+     */
     private $socket;
 
     /**
