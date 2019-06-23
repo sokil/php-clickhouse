@@ -47,7 +47,7 @@ class ConnectionTest extends TestCase
                 'INSERT INTO %s VALUES (10000000, 1), (2, 20000000), (30000000, 3)',
                 self::TABLE_NAME
             )
-        );+
+        );
 
         $response = $connection->execute(sprintf(
             'SELECT * FROM %s',
