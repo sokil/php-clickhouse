@@ -38,6 +38,8 @@ class StreamConnection extends AbstractConnection
             );
         }
 
+        stream_set_blocking($socket, true);
+
         $this->socket = $socket;
 
         return $this->socket;
@@ -68,7 +70,9 @@ class StreamConnection extends AbstractConnection
             $query;
 
         // send request
-        fwrite($socket, $request);
+        if (fwrite($socket, $request) === false) {
+            throw new ConnectError('Socket write error');
+        }
 
         // read response
         $response = '';
