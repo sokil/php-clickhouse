@@ -13,36 +13,58 @@ class StreamConnection extends AbstractConnection
     /**
      * @var resource
      */
-    private $socket;
+    private $stream;
 
     /**
      * @return resource
+     *
+     * @throws ConnectError
      */
-    public function getSocket()
+    private function getStream()
     {
-        if ($this->socket) {
-            return $this->socket;
+        if ($this->stream) {
+            return $this->stream;
         }
 
-        $socket = stream_socket_client(
-            sprintf('tcp://%s:%s', $this->getHost(), $this->getPort()),
-            $errorCode,
-            $errorMessage,
-            $this->getConnectionTimeoutMs()
+        // suppress warning when connection now allowed
+        set_error_handler(
+            function ($type, $errorMessage) {
+                throw new ConnectError(
+                    sprintf('Connection error: %s', $errorMessage)
+                );
+            }
         );
 
-        if ($socket === false) {
-            throw new ConnectError(
-                sprintf('Connection error: %s', $errorMessage),
-                $errorCode
+        try {
+            $socket = stream_socket_client(
+                sprintf('tcp://%s:%s', $this->getHost(), $this->getPort()),
+                $errorCode,
+                $errorMessage,
+                $this->getConnectionTimeoutMs(),
+                STREAM_CLIENT_CONNECT
             );
+
+            if ($socket === false) {
+                throw new ConnectError(
+                    sprintf('Connection error: %s', $errorMessage),
+                    $errorCode
+                );
+            }
+        } finally {
+            restore_error_handler();
         }
 
+        // blocking mode
         stream_set_blocking($socket, true);
 
-        $this->socket = $socket;
+        // read/write timeout
+        $seconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
+        $microseconds = $this->getRequestTimeoutMs() - $seconds * 1e6;
+        stream_set_timeout($socket, (int)$seconds, (int)$microseconds);
 
-        return $this->socket;
+        $this->stream = $socket;
+
+        return $this->stream;
     }
 
     public function execute(string $query): string
@@ -50,7 +72,7 @@ class StreamConnection extends AbstractConnection
         $query .= "\r\n";
 
         // create socket
-        $socket = $this->getSocket();
+        $stream = $this->getStream();
 
         // prepare HTTP QUERY
         $request =
@@ -69,18 +91,21 @@ class StreamConnection extends AbstractConnection
             "\r\n" .
             $query;
 
+        $this->wait($stream);
+
         // send request
-        if (fwrite($socket, $request) === false) {
+        if (fwrite($stream, $request) === false) {
             throw new ConnectError('Socket write error');
         }
 
+        $this->wait($stream);
+
         // read response
         $response = '';
-        while (!feof($socket)) {
-            $responseChunk = fgets($socket, self::READ_BUFFER_LENGTH);
-
-            if ($responseChunk === false) {
-                throw new ConnectError('Socket read error');
+        while (true) {
+            $responseChunk = fread($stream, self::READ_BUFFER_LENGTH);
+            if ($responseChunk === false || $responseChunk === '') {
+                break;
             }
 
             $response .= $responseChunk;
@@ -94,7 +119,7 @@ class StreamConnection extends AbstractConnection
                 throw new QueryError($response, $responseCode);
             }
         } else {
-            throw new ConnectError('Not HTTP response');
+            throw new ConnectError(sprintf('Invalid HTTP response: "%s"', $response));
         }
 
         return $response;
@@ -103,23 +128,27 @@ class StreamConnection extends AbstractConnection
     /**
      * Wait socket
      *
-     * @param resource $socket
+     * @param resource $stream
      */
-    private function wait($socket) : void
+    private function wait($stream) : void
     {
-        $read = [$socket];
-        $write = [$socket];
+        $read = [$stream];
+        $write = [$stream];
         $except = [];
 
-        $changedSocketCount = socket_select($read, $write, $except, 10);
+        $requestTimeoutSeconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
+        $requestTimeoutMicroseconds = (int)($this->getRequestTimeoutMs() - $requestTimeoutSeconds * 1e6);
+
+        $changedSocketCount = stream_select(
+            $read,
+            $write,
+            $except,
+            $requestTimeoutSeconds,
+            $requestTimeoutMicroseconds
+        );
 
         if ($changedSocketCount === false) {
-            $errorCode = socket_last_error();
-            $errorMessage = socket_strerror($errorCode);
-            throw new ConnectError(
-                sprintf('Receive response error: %s', $errorMessage),
-                $errorCode
-            );
+            throw new ConnectError('Receive response error');
         }
 
         if ($changedSocketCount === 0) {

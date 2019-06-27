@@ -37,7 +37,7 @@ class ClientTest extends TestCase
     public function testConnectError()
     {
         $this->expectException(ConnectError::class);
-        $this->expectExceptionMessage('Error connecting ClickHouse at server.com:100');
+        $this->expectExceptionMessage('Connection error: unable to connect to server.com:100');
         $this->expectExceptionCode(0);
 
         $client = new Client(

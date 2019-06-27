@@ -21,7 +21,7 @@ class SocketConnection extends AbstractConnection
     /**
      * @return resource
      */
-    public function getSocket()
+    private function getSocket()
     {
         if ($this->socket) {
             return $this->socket;
@@ -178,7 +178,16 @@ class SocketConnection extends AbstractConnection
         $write = [$socket];
         $except = [];
 
-        $changedSocketCount = socket_select($read, $write, $except, 10);
+        $requestTimeoutSeconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
+        $requestTimeoutMicroseconds = (int)$this->getRequestTimeoutMs() - $requestTimeoutSeconds * 1e6;
+
+        $changedSocketCount = socket_select(
+            $read,
+            $write,
+            $except,
+            $requestTimeoutSeconds,
+            $requestTimeoutMicroseconds
+        );
 
         if ($changedSocketCount === false) {
             $errorCode = socket_last_error();

@@ -71,7 +71,7 @@ class CurlConnection extends AbstractConnection
         if ($response === false) {
             throw new ConnectError(
                 sprintf(
-                    'Error connecting ClickHouse at %s:%s',
+                    'Connection error: unable to connect to %s:%s',
                     $this->getHost(),
                     $this->getPort()
                 ),
