@@ -8,7 +8,7 @@ use Sokil\ClickHouse\Connection\Exception\QueryError;
 
 class StreamConnection extends AbstractConnection
 {
-    private const READ_BUFFER_LENGTH = 1024;
+    private const READ_BUFFER_LENGTH = 2048;
 
     /**
      * @var resource
@@ -58,9 +58,9 @@ class StreamConnection extends AbstractConnection
         stream_set_blocking($socket, true);
 
         // read/write timeout
-        $seconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
-        $microseconds = $this->getRequestTimeoutMs() - $seconds * 1e6;
-        stream_set_timeout($socket, (int)$seconds, (int)$microseconds);
+        $sendReceiveTimeout = $this->getTimevalStruct($this->getRequestTimeoutMs());
+
+        stream_set_timeout($socket, $sendReceiveTimeout->getSeconds(), $sendReceiveTimeout->getMicroSeconds());
 
         $this->stream = $socket;
 
@@ -81,7 +81,7 @@ class StreamConnection extends AbstractConnection
             implode(
                 "\r\n",
                 [
-                    'Content-Length: ' . mb_strlen($query),
+                    'Content-Length: ' . strlen($query),
                     'Connection: Keep-Alive',
                     'User-Agent: SOKIL/PHP-CLICKHOUSE:0.0.1',
                     'Content-Type: text/plain; charset=UTF-8',
@@ -91,28 +91,28 @@ class StreamConnection extends AbstractConnection
             "\r\n" .
             $query;
 
-        $this->wait($stream);
-
         // send request
-        if (fwrite($stream, $request) === false) {
+        if (stream_socket_sendto($stream, $request) === false) {
             throw new ConnectError('Socket write error');
         }
-
-        $this->wait($stream);
 
         // read response
         $response = '';
         while (true) {
-            $responseChunk = fread($stream, self::READ_BUFFER_LENGTH);
+            $responseChunk = stream_socket_recvfrom($stream, self::READ_BUFFER_LENGTH);
             if ($responseChunk === false || $responseChunk === '') {
                 break;
             }
 
             $response .= $responseChunk;
+
+            if (strlen($responseChunk) < self::READ_BUFFER_LENGTH) {
+                break;
+            }
         }
 
         // get response code
-        if (preg_match('~HTTP/\d\.\d (\d{3})~', mb_substr($response, 0, 12), $matches)) {
+        if (preg_match('~HTTP/\d\.\d (\d{3})~', substr($response, 0, 12), $matches)) {
             $responseCode = (int)$matches[1];
 
             if ($responseCode !== 200) {
@@ -136,15 +136,14 @@ class StreamConnection extends AbstractConnection
         $write = [$stream];
         $except = [];
 
-        $requestTimeoutSeconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
-        $requestTimeoutMicroseconds = (int)($this->getRequestTimeoutMs() - $requestTimeoutSeconds * 1e6);
+        $sendReceiveTimeout = $this->getTimevalStruct($this->getRequestTimeoutMs());
 
         $changedSocketCount = stream_select(
             $read,
             $write,
             $except,
-            $requestTimeoutSeconds,
-            $requestTimeoutMicroseconds
+            $sendReceiveTimeout->getSeconds(),
+            $sendReceiveTimeout->getMicroSeconds()
         );
 
         if ($changedSocketCount === false) {

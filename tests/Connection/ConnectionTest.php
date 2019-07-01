@@ -13,14 +13,14 @@ class ConnectionTest extends TestCase
     {
         return [
             'stream' => [
-                'connection' => new StreamConnection('localhost', 8123)
+                'connection' => new StreamConnection('localhost', 8123, 60000, 60000)
             ],
-            'socket' => [
-                'connection' => new SocketConnection('localhost', 8123)
-            ],
-            'curl' => [
-                'connection' => new CurlConnection('localhost', 8123)
-            ],
+//            'socket' => [
+//                'connection' => new SocketConnection('localhost', 8123, 60000, 60000)
+//            ],
+//            'curl' => [
+//                'connection' => new CurlConnection('localhost', 8123, 60000, 60000)
+//            ],
         ];
     }
 

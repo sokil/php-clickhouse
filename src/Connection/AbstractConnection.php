@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 namespace Sokil\ClickHouse\Connection;
 
+use Sokil\ClickHouse\Connection\Struct\Timeval;
+
 abstract class AbstractConnection
 {
-    private const DEFAULT_CONNECTION_TIMEOUT_MS = 1000;
+    private const DEFAULT_CONNECTION_TIMEOUT_MS = 3000;
 
-    private const DEFAULT_REQUEST_TIMEOUT_MS = 1000;
+    private const DEFAULT_REQUEST_TIMEOUT_MS = 3000;
 
     /**
      * @var string
@@ -88,5 +90,23 @@ abstract class AbstractConnection
         return $this->requestTimeoutMs;
     }
 
+    /**
+     * Useful for socket's SO_SNDTIMEO/SO_RCVTIMEO timeout options or select() calls.
+     *
+     * @see timeval struct from sys/time.h
+     *
+     * @param int $timeMs
+     *
+     * @return Timeval
+     */
+    protected function getTimevalStruct(int $timeMs) : Timeval
+    {
+        $seconds = floor($timeMs / 1e3);
+        $microSeconds = fmod($timeMs, 1e3) * 1e3;
 
+        return new Timeval(
+            (int)$seconds,
+            (int)$microSeconds
+        );
+    }
 }

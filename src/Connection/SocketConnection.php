@@ -11,7 +11,7 @@ use Sokil\ClickHouse\Connection\Exception\QueryError;
  */
 class SocketConnection extends AbstractConnection
 {
-    private const READ_BUFFER_LENGTH = 1024;
+    private const READ_BUFFER_LENGTH = 2048;
 
     /**
      * @var resource
@@ -33,16 +33,25 @@ class SocketConnection extends AbstractConnection
             SOL_TCP
         );
 
-        $seconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
-        $microseconds = $this->getRequestTimeoutMs() - $seconds * 1e6;
+        $sendReadTimeout = $this->getTimevalStruct($this->getRequestTimeoutMs());
+
+        socket_set_option(
+            $this->socket,
+            SOL_SOCKET,
+            SO_SNDTIMEO,
+            [
+                'sec' => $sendReadTimeout->getSeconds(),
+                'usec' => $sendReadTimeout->getMicroSeconds(),
+            ]
+        );
 
         socket_set_option(
             $this->socket,
             SOL_SOCKET,
             SO_RCVTIMEO,
             [
-                'sec' => $seconds,
-                'usec' => $microseconds
+                'sec' => $sendReadTimeout->getSeconds(),
+                'usec' => $sendReadTimeout->getMicroSeconds(),
             ]
         );
 
@@ -53,15 +62,6 @@ class SocketConnection extends AbstractConnection
             1
         );
 
-        socket_set_option(
-            $this->socket,
-            SOL_SOCKET,
-            SO_SNDTIMEO,
-            [
-                'sec' => $seconds,
-                'usec' => $microseconds
-            ]
-        );
 
         // Disable Nagle's algorithm, which optimises sending of small packets
         socket_set_option(
@@ -99,9 +99,8 @@ class SocketConnection extends AbstractConnection
             implode(
                 "\r\n",
                 [
-                    'Content-Length: ' . mb_strlen($query),
+                    'Content-Length: ' . strlen($query),
                     'Connection: Keep-Alive',
-                    'User-Agent: SOKIL/PHP-CLICKHOUSE:0.0.1',
                     'Content-Type: text/plain; charset=UTF-8',
                 ]
             ) .
@@ -109,11 +108,17 @@ class SocketConnection extends AbstractConnection
             "\r\n" .
             $query;
 
-        $this->wait($socket);
+        $requestLength = strlen($request);
 
         // send request
-        $bytesWritten = socket_write($socket, $request, mb_strlen($request));
-        if ($bytesWritten === false) {
+        $bytesSent = socket_send(
+            $socket,
+            $request,
+            $requestLength,
+            0
+        );
+
+        if ($bytesSent === false) {
             $errorCode = socket_last_error();
             $errorMessage = socket_strerror($errorCode);
             throw new ConnectError(
@@ -122,16 +127,23 @@ class SocketConnection extends AbstractConnection
             );
         }
 
-        // wait read
-        $this->wait($socket);
+        if ($bytesSent < $requestLength) {
+            throw new ConnectError('Socket write error: partial request sent to server');
+        }
 
         // read response
         $response = '';
 
-        while (true) {
-            $responseChunk = socket_read($socket, self::READ_BUFFER_LENGTH);
 
-            if ($responseChunk === false) {
+        while (true) {
+            $bytesReceived = socket_recv(
+                $socket,
+                $responseChunk,
+                self::READ_BUFFER_LENGTH,
+                0
+            );
+
+            if ($bytesReceived === false) {
                 $errorCode = socket_last_error();
                 $errorMessage = socket_strerror($errorCode);
                 throw new ConnectError(
@@ -140,17 +152,17 @@ class SocketConnection extends AbstractConnection
                 );
             }
 
-            if ($responseChunk === '') {
+            if ($bytesReceived === 0) {
                 break;
             }
 
             $response .= $responseChunk;
 
-            /*
-            if (mb_strlen($responseChunk) < self::READ_BUFFER_LENGTH) {
+            if (strlen($responseChunk) < self::READ_BUFFER_LENGTH) {
                 break;
             }
-            */
+
+            usleep(10);
         }
 
         // get response code
@@ -178,15 +190,14 @@ class SocketConnection extends AbstractConnection
         $write = [$socket];
         $except = [];
 
-        $requestTimeoutSeconds = (int)floor($this->getRequestTimeoutMs() / 1e6);
-        $requestTimeoutMicroseconds = (int)$this->getRequestTimeoutMs() - $requestTimeoutSeconds * 1e6;
+        $sendReceiveTimeout = $this->getTimevalStruct($this->getRequestTimeoutMs());
 
         $changedSocketCount = socket_select(
             $read,
             $write,
             $except,
-            $requestTimeoutSeconds,
-            $requestTimeoutMicroseconds
+            $sendReceiveTimeout->getSeconds(),
+            $sendReceiveTimeout->getMicroSeconds()
         );
 
         if ($changedSocketCount === false) {
